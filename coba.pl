@@ -76,10 +76,34 @@ for ( @{$decoded->{events}} ) {
 				close $fh;
 			}
 		}
+		elsif ($_->{message}->{text} eq "!leave"){
+			if ($_->{source}->{type} eq "group"){
+				my $msg = "Terima kasih dan sampai jumpa.";
+				my $messages = LINE::Bot::API::Builder::SendMessage->new(
+					)->add_text(
+					    text => $msg,
+					);
+				my $res = $bot->reply_message($_->{replyToken}, $messages->build);
+				unless ($res->is_success) {
+					# error handling
+					open(my $fh, '>>', 'log_error.txt');
+					print $fh localtime()."\t".e."\n";
+					close $fh;
+				}
+				my $ret = $bot->leave_group($_->{source}->{groupId});
+				unless ($ret->is_success) {
+					# error handling
+					open(my $fh, '>>', 'log_error.txt');
+					print $fh localtime()."\t".e."\n";
+					close $fh;
+				}
+				my $sth = $dbh->prepare("DELETE FROM `group` WHERE `id`=?;");
+				$sth->execute($_->{source}->{groupId}) or die $DBI::errstr;
+				$sth->finish();
+				$dbh->commit or die $DBI::errstr;
+			}
+		}
 	} elsif ($_->{type} eq "join"){
-		open(my $fh, '>>', 'group.txt');
-		print $fh localtime()."\t".$_->{source}->{groupId}."\n";
-		close $fh;
 		my $msg = "halo\nUntuk melihat list perintah yang dapat dipakai, silakan cek beranda kami\nTerima kasih";
 		my $messages = LINE::Bot::API::Builder::SendMessage->new(
 			)->add_text(
@@ -92,6 +116,10 @@ for ( @{$decoded->{events}} ) {
 			print $fh localtime()."\t".e."\n";
 			close $fh;
 		}
+		my $sth = $dbh->prepare("INSERT INTO `group` VALUES(?);");
+		$sth->execute($_->{source}->{groupId}) or die $DBI::errstr;
+		$sth->finish();
+		$dbh->commit or die $DBI::errstr;
 	} elsif ($_->{type} eq "follow"){
 		my $msg = "halo ";
 		my $usrid = $_->{source}->{userId};
@@ -115,5 +143,14 @@ for ( @{$decoded->{events}} ) {
 			print $fh localtime()."\t".e."\n";
 			close $fh;
 		}
+		my $sth = $dbh->prepare("INSERT INTO `user` VALUES(?);");
+		$sth->execute($_->{source}->{userId}) or die $DBI::errstr;
+		$sth->finish();
+		$dbh->commit or die $DBI::errstr;
+	} elsif ($_->{type} eq "unfollow"){
+		my $sth = $dbh->prepare("DELETE FROM `user` WHERE `id`=?;");
+		$sth->execute($_->{source}->{userId}) or die $DBI::errstr;
+		$sth->finish();
+		$dbh->commit or die $DBI::errstr;
 	}
 }

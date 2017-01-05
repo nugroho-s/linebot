@@ -9,6 +9,8 @@ use Data::Dumper;
 use LINE::Bot::API;
 use LINE::Bot::API::Builder::SendMessage;
 
+use constant PI    => 4 * atan2(1, 1);
+
 print "Content-Type: text/html\n\n";
 
 my $driver = "mysql"; 
@@ -35,50 +37,23 @@ $decoded = decode_json($value);
 print $value."\n\n";
 for ( @{$decoded->{events}} ) {
 	if ($_->{type} eq "message"){
-		if ($_->{message}->{text} eq "!kuis"){
-			# do kuis
-			$msg = "jawaban kuis hari ini : ";
-			my $sth = $dbh->prepare("SELECT `jawaban` FROM `kuis` WHERE `tanggal`=(SELECT DATE(DATE_SUB(NOW(),INTERVAL 7 HOUR)));");
-			$sth->execute() or die $DBI::errstr;
-			print "Number of rows found :" + $sth->rows;
-			if ($sth->rows==0){
-				$msg = $msg."belum ditambahkan"
-			}
-			else{
-				while (my @row = $sth->fetchrow_array()) {
-					my ($jawaban ) = @row;
-					$msg = $msg.$jawaban
+		@hsl = split(/ /,$_->{message}->{text});
+		if (@hsl == 1){
+			if ($_->{message}->{text} eq "!kuis"){
+				# do kuis
+				$msg = "jawaban kuis hari ini : ";
+				my $sth = $dbh->prepare("SELECT `jawaban` FROM `kuis` WHERE `tanggal`=(SELECT DATE(DATE_SUB(NOW(),INTERVAL 7 HOUR)));");
+				$sth->execute() or die $DBI::errstr;
+				print "Number of rows found :" + $sth->rows;
+				if ($sth->rows==0){
+					$msg = $msg."belum ditambahkan"
 				}
-			}
-			my $messages = LINE::Bot::API::Builder::SendMessage->new(
-				)->add_text(
-				    text => $msg,
-				);
-			my $res = $bot->reply_message($_->{replyToken}, $messages->build);
-			unless ($res->is_success) {
-				# error handling
-				open(my $fh, '>>', 'log_error.txt');
-				print $fh localtime()."\t".e."\n";
-				close $fh;
-			}
-		}
-		elsif ($_->{message}->{text} eq "!about"){
-			my $msg = "bot Nugsky\ncreated by Nugroho Satriyanto";
-			my $messages = LINE::Bot::API::Builder::SendMessage->new(
-				)->add_text(
-				    text => $msg,
-				);
-			my $res = $bot->reply_message($_->{replyToken}, $messages->build);
-			unless ($res->is_success) {
-				# error handling
-				open(my $fh, '>>', 'log_error.txt');
-				print $fh localtime()."\t".e."\n";
-				close $fh;
-			}
-		}
-		elsif ($_->{message}->{text} eq "!leave"){
-			if ($_->{source}->{type} eq "group"){
-				my $msg = "Terima kasih dan sampai jumpa.";
+				else{
+					while (my @row = $sth->fetchrow_array()) {
+						my ($jawaban ) = @row;
+						$msg = $msg.$jawaban
+					}
+				}
 				my $messages = LINE::Bot::API::Builder::SendMessage->new(
 					)->add_text(
 					    text => $msg,
@@ -90,17 +65,63 @@ for ( @{$decoded->{events}} ) {
 					print $fh localtime()."\t".e."\n";
 					close $fh;
 				}
-				my $ret = $bot->leave_group($_->{source}->{groupId});
-				unless ($ret->is_success) {
+			}
+			elsif ($_->{message}->{text} eq "!about"){
+				my $msg = "bot Nugsky\ncreated by Nugroho Satriyanto";
+				my $messages = LINE::Bot::API::Builder::SendMessage->new(
+					)->add_text(
+					    text => $msg,
+					);
+				my $res = $bot->reply_message($_->{replyToken}, $messages->build);
+				unless ($res->is_success) {
 					# error handling
 					open(my $fh, '>>', 'log_error.txt');
 					print $fh localtime()."\t".e."\n";
 					close $fh;
 				}
-				my $sth = $dbh->prepare("DELETE FROM `group` WHERE `id`=?;");
-				$sth->execute($_->{source}->{groupId}) or die $DBI::errstr;
-				$sth->finish();
-				$dbh->commit or die $DBI::errstr;
+			}
+			elsif ($_->{message}->{text} eq "!leave"){
+				if ($_->{source}->{type} eq "group"){
+					my $msg = "Terima kasih dan sampai jumpa.";
+					my $messages = LINE::Bot::API::Builder::SendMessage->new(
+						)->add_text(
+						    text => $msg,
+						);
+					my $res = $bot->reply_message($_->{replyToken}, $messages->build);
+					unless ($res->is_success) {
+						# error handling
+						open(my $fh, '>>', 'log_error.txt');
+						print $fh localtime()."\t".e."\n";
+						close $fh;
+					}
+					my $ret = $bot->leave_group($_->{source}->{groupId});
+					unless ($ret->is_success) {
+						# error handling
+						open(my $fh, '>>', 'log_error.txt');
+						print $fh localtime()."\t".e."\n";
+						close $fh;
+					}
+					my $sth = $dbh->prepare("DELETE FROM `group` WHERE `id`=?;");
+					$sth->execute($_->{source}->{groupId}) or die $DBI::errstr;
+					$sth->finish();
+					$dbh->commit or die $DBI::errstr;
+				}
+			}
+		} elsif (@hsl == 2){
+			if ($hsl[0] eq "!hitung"){
+				my $ret = eval $hsl[1];
+				my $msg = "hasil=".$ret;
+				my $messages = LINE::Bot::API::Builder::SendMessage->new(
+					)->add_text(
+					    text => $msg,
+					);
+				my $res = $bot->reply_message($_->{replyToken}, $messages->build);
+				unless ($res->is_success) {
+					# error handling
+					open(my $fh, '>>', 'log_error.txt');
+					print $fh localtime()."\thitungan\n";
+					close $fh;
+				}
 			}
 		}
 	} elsif ($_->{type} eq "join"){
